@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Razer, Inc. — vendor-id 0x1532 = 5426 (decimal, como exige Android) -->
+    <usb-device vendor-id="5426" />
+</resources>

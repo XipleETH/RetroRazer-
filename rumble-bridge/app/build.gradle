@@ -1,0 +1,37 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+android {
+    namespace 'com.retrorazer.rumblebridge'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.retrorazer.rumblebridge"
+        minSdk 26          // Sensa HD Haptics requiere Android 12+, pero la app corre desde 8.0
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+}
+
+dependencies {
+    // Sin AndroidX a propósito: la app usa solo el framework de Android
+    // (android.app.Activity, UsbManager, InputDevice, Vibrator) para evitar
+    // dependencias externas y compilar en cualquier entorno con SDK.
+}
