@@ -72,7 +72,7 @@ flowchart LR
 3. **Razer Nexus** → Audio Haptics = **High（高）**。メディア音量を上げます。
 4. パッチ済み RetroArch で PS1 のゲームを起動し、*コアオプション*でコントローラーを
    **DualShock/アナログ**、**Rumble = ON** に設定します
-   （[`docs/RETROARCH-CONFIG.md`](docs/RETROARCH-CONFIG.md) 参照）。
+   （[`docs/RETROARCH-CONFIG.ja.md`](docs/RETROARCH-CONFIG.ja.md) 参照）。
 5. プレイ — Kishi がゲームの実際のランブルで振動します。
 
 ---

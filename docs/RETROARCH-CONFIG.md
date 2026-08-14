@@ -1,58 +1,58 @@
-# Configuración de RetroArch para rumble (Camino A)
+<!-- Language: English (default) -->
+**English** · [Español](RETROARCH-CONFIG.es.md) · [日本語](RETROARCH-CONFIG.ja.md)
 
-Aunque el frontend enrute bien la vibración al control, **no sentirás nada** si el
-núcleo no la pide. Estos son los ajustes que hay que tocar para PlayStation 1 y
-otros sistemas. Aplica todo esto **antes** de dar por fallido el arreglo.
+# RetroArch configuration for rumble
 
-## 1. Ajustes globales de entrada
+Even with the bridge working, you feel **nothing** if the core doesn't *request*
+rumble. Apply all of this before assuming something is broken.
 
-`Ajustes → Entrada`:
+## 1. Global input settings
 
-- **Vibración / Rumble**: activado.
-- Si tu build lo tiene: **Vibrar en los mandos / Enable Device Vibration** →
-  activado (esto es lo que hace que la vibración vaya al mando y no al teléfono).
+`Settings → Input`:
 
-En `retroarch.cfg` los ajustes equivalentes:
+- **Rumble / Vibration**: ON.
+- If your build has it: **Enable Device Vibration** → ON.
 
+In `retroarch.cfg`:
 ```ini
-# Habilita el reenvío de rumble en general
 input_rumble_enable = "true"
-# (nombre puede variar según versión/fork; busca claves con 'rumble' o 'vibrat')
 ```
 
-## 2. Opción de núcleo: Rumble (imprescindible en PS1)
+## 2. Core option: Rumble (required for PS1)
 
-Con un juego de PS1 cargado: `Menú rápido → Opciones` (opciones del núcleo).
+With a PS1 game loaded: `Quick Menu → Options`.
 
 ### Beetle PSX / Beetle PSX HW
 - **Rumble** = `enabled`
-- El puerto del mando debe estar en un tipo **analógico/DualShock** para que el
-  juego active los motores.
+- Controller port must be an **analog / DualShock** type.
 
 ### PCSX-ReARMed
 - **Rumble** (`pcsx_rearmed_vibration`) = `enabled`
-- **Pad type for port 1** (`pcsx_rearmed_pad1type`) = `analog` o `dualshock`
+- **Pad type for port 1** (`pcsx_rearmed_pad1type`) = `analog` or `dualshock`
 
 ### SwanStation / DuckStation-libretro
 - **Controller 1 Type** = `Analog Controller (DualShock)`
 - **Enable Rumble / Vibration** = `enabled`
 
-> Regla general: **DualShock/analógico + Rumble activado**. Un mando "digital/standard"
-> nunca pedirá vibración.
+> Rule of thumb: **DualShock/analog + Rumble ON**. A "digital/standard" pad never
+> asks for vibration.
 
-## 3. Mapear el control como puerto 1
+## 3. Map the controller to port 1
 
-`Ajustes → Entrada → Puerto 1` — asegúrate de que el Razer está asignado al
-**Puerto 1** (que es el que la mayoría de juegos de 1 jugador usan para rumble).
+`Settings → Input → Port 1` — make sure the Kishi is assigned to **Port 1** (most
+1‑player games drive rumble on port 1).
 
-## 4. Comprobación rápida
+## 4. Quick test
 
-Juegos de PS1 con rumble muy evidente para probar:
-- *Ape Escape* (requiere DualShock, vibración constante).
-- *Metal Gear Solid* (vibración en alerta / vía de comunicaciones).
-- *Gran Turismo 2* (golpes/derrapes).
+PS1 games with obvious rumble:
+- *Ape Escape* (needs DualShock, constant vibration)
+- *Metal Gear Solid* (alert / codec buzz)
+- *Gran Turismo 2* (impacts / skids)
 
-Si con esto no vibra y `rumble-bridge` confirmó `hasVibrator = true` y que *Probar*
-sí mueve los motores, el problema está en el **eslabón 3** → aplica el parche de
-`patches/`. Si `rumble-bridge` dice `hasVibrator = false`, estás en el **Camino B**
-(ver `ANALISIS-TECNICO.md`).
+## Troubleshooting
+
+- Nothing vibrates → confirm the **RetroRazer bridge service is running** and
+  **Razer Nexus Audio Haptics = High**, media volume up.
+- Still nothing → check core options above (DualShock + Rumble).
+- Audio also vibrates → make sure you use the **patched RetroArch**
+  (`RetroArch-RetroRazer.apk`), which marks game audio as non-capturable.

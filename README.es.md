@@ -73,7 +73,7 @@ Dos APK, compilados en la nube (GitHub Actions). Abre estos enlaces **en el celu
 3. **Razer Nexus** → Audio Haptics = **Alta**. Sube el volumen de multimedia.
 4. En el RetroArch parcheado, carga un juego de PS1 y en *Opciones del núcleo* pon
    el mando en **DualShock/analógico** y **Rumble = ON** (ver
-   [`docs/RETROARCH-CONFIG.md`](docs/RETROARCH-CONFIG.md)).
+   [`docs/RETROARCH-CONFIG.es.md`](docs/RETROARCH-CONFIG.es.md)).
 5. Juega — el Kishi vibra con el rumble real del juego.
 
 ---
