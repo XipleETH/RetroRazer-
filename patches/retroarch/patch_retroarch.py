@@ -24,6 +24,9 @@ import shutil
 INJ_RUMBLE = (
     "    invoke-static {p0, p2, p3}, "
     "Lcom/retrorazer/RRBridge;->rumble(Landroid/content/Context;II)V\n"
+    # Termina doVibrate aquí: reenviamos el rumble a RetroRazer y NO ejecutamos el
+    # código original que hace vibrar el vibrador del teléfono. Solo vibra el Kishi.
+    "    return-void\n"
 )
 INJ_BLOCK = (
     "    invoke-static {p0}, "
