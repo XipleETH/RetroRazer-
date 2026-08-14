@@ -1,61 +1,109 @@
+<!-- Language: English (default) -->
+**English** · [Español](README.es.md) · [日本語](README.ja.md)
+
 # RetroRazer
 
-**Objetivo:** hacer que las vibraciones (rumble) de los juegos originales —PlayStation 1, Game Boy Advance, etc.— emulados en **RetroArch para Android** lleguen a los motores del control **Razer** con tecnología **Sensa HD Haptics** (Razer Kishi Ultra), que hoy no vibran aunque la caja diga que deberían.
+**Real in-game rumble for the Razer Kishi V2 Pro in RetroArch on Android.**
 
-> ## 📣 Hallazgo confirmado (Kishi V2 Pro)
-> La app de diagnóstico, con un **Razer Kishi V2 Pro** real, reportó **`vibrador
-> estándar: NO`**. Este control usa **HyperSense / Audio Haptics**: vibra a partir
-> del **audio del juego**, no de comandos de rumble. Por eso no vibra en RetroArch
-> por la vía normal. **La solución correcta está en → [`docs/SOLUCION-KISHI-V2PRO.md`](docs/SOLUCION-KISHI-V2PRO.md)**
-> (configurar Razer Nexus Audio Haptics, o construir un puente rumble→audio).
+Turns the actual rumble commands of emulated games (PlayStation 1, GBA, and more)
+into vibration on the **Razer Kishi V2 Pro**'s HyperSense haptic motors — something
+the controller's box promises but that RetroArch never delivered on its own.
 
-Este repositorio contiene:
-
-1. **`rumble-bridge/`** — una app Android nativa de **diagnóstico y prueba de rumble**. Es la pieza clave: detecta el control, dice exactamente *cómo* expone (o no) sus motores a Android, y **hace vibrar los motores** para comprobarlo. Sin esto trabajaríamos a ciegas.
-2. **`patches/`** — el parche para el frontend Android de RetroArch que enruta el rumble al **control conectado** en vez de al teléfono.
-3. **`docs/`** — el análisis técnico completo y la guía de configuración de RetroArch.
+> Status: **working and validated on real hardware** (Razer Kishi V2 Pro, RetroArch
+> 1.20.0 aarch64). It faithfully reproduces the game's rumble, cleanly separated
+> from game audio.
 
 ---
 
-## El problema, en corto
+## The problem
 
-Para que un juego de PS1 haga vibrar tu control tienen que cumplirse **tres eslabones**, y basta que uno falle para que no sientas nada:
+The Kishi V2 Pro's motors are **not** driven by the standard Android rumble API
+(`InputDevice.getVibrator()` reports **no vibrator**). They are driven by
+**Razer HyperSense / Audio Haptics** through the **Razer Nexus** app, which turns
+**game audio** into vibration. So:
 
+- RetroArch's rumble never reached the motors (wrong API).
+- Plain audio-to-haptics vibrates on *sound*, not on the game's real rumble — it
+  feels vague and wrong.
+
+## How RetroRazer solves it
+
+We use the controller's audio-haptics engine on purpose, but feed it a precise
+signal derived from the **real rumble command**, and we stop the game's own audio
+from leaking into the haptics.
+
+```mermaid
+flowchart LR
+    A["PS1 game<br/>asks for rumble"] --> B["Patched RetroArch<br/>doVibrate()"]
+    B -- "broadcast: strength 0-65535" --> C["RetroRazer service<br/>HapticEngine"]
+    C -- "calibrated low-freq pulse (audio)" --> D["Razer Nexus<br/>HyperSense"]
+    D --> E["Kishi motors vibrate 🎮"]
+    B -. "game audio marked<br/>NON-capturable" .-> D
 ```
-[Juego PS1]  →  [Núcleo libretro emite rumble]  →  [Frontend RetroArch reenvía la vibración]  →  [Android/USB entrega la vibración al control]  →  [Motores del Razer]
-     (1)                    (2)                                 (3)                                         (4)
-```
 
-- **(2) El núcleo debe emitir rumble.** Muchos núcleos de PS1 (Beetle PSX, PCSX-ReARMed, SwanStation) solo generan rumble si activas la opción de núcleo *Rumble* y usas un **DualShock/analog** como tipo de mando. Si el juego cree que tiene un mando digital, nunca pide vibración.  → Ver `docs/RETROARCH-CONFIG.md`.
-- **(3) El frontend debe reenviar la vibración al control**, no al vibrador del teléfono. Aquí está el fallo histórico de RetroArch en Android. → Ver `patches/`.
-- **(4) Android/USB debe poder entregar la vibración a los motores del Razer.** Y aquí está la gran incógnita del hardware ↓
+1. **Patched RetroArch** — one injected call in `doVibrate` broadcasts the real
+   rumble strength. A second injection marks RetroArch's audio as *non-capturable*
+   so Nexus ignores the game's sound.
+2. **RetroRazer app** — a foreground service receives the strength and generates a
+   calibrated **low-frequency audio pulse** proportional to it.
+3. **Razer Nexus HyperSense** converts that pulse — and *only* that pulse — into
+   motor vibration.
 
-## La incógnita del hardware (por eso existe `rumble-bridge`)
-
-Las **Sensa HD Haptics** del Kishi Ultra usan bobinas hápticas gobernadas por el **SDK Interhaptics / app Razer Nexus** (con conversión *audio-to-haptics*). **No está garantizado** que Android exponga esos motores por la API estándar de vibración de mandos (`InputDevice.getVibrator()` / `VibratorManager`).
-
-Hay dos escenarios posibles:
-
-- **Camino A — El control SÍ expone un vibrador estándar.**
-  Entonces el arreglo es: activar el rumble en el núcleo (2) + parchear/configurar RetroArch para que enrute al control (3). La app `rumble-bridge` lo confirma en 10 segundos y lo hace vibrar.
-- **Camino B — El control NO expone vibrador estándar** (los motores solo responden a reportes HID propietarios de Razer sobre USB).
-  Entonces ninguna configuración de RetroArch bastará: hay que **enviar reportes HID por USB** al control. `rumble-bridge` incluye un modo de **descubrimiento HID por USB Host** para hacer mover los motores y aprender el formato de reporte de Razer, que es el requisito previo para cualquier puente real.
-
-**No inventamos un protocolo que no podemos verificar.** La app mide la realidad de *tu* control y de ahí decidimos el camino. Los pasos que requieren el hardware están marcados como **[REQUIERE DISPOSITIVO]** en la documentación.
+Result: the controller vibrates **when and how the game commands it**, not on
+random sound.
 
 ---
 
-## Empezar aquí
+## Download & install (no PC needed)
 
-1. Compila e instala la app de diagnóstico:
-   ```bash
-   cd rumble-bridge
-   # Abre la carpeta en Android Studio (recomendado) y pulsa Run,
-   # o por línea de comandos:
-   gradle wrapper        # genera ./gradlew la primera vez
-   ./gradlew installDebug
-   ```
-2. Conecta el Kishi Ultra, abre **RetroRazer Rumble Bridge** y lee el informe. Te dirá si estás en el **Camino A** o **B** y te dejará pulsar *Probar* para sentir los motores.
-3. Según el resultado, sigue `docs/RETROARCH-CONFIG.md` (Camino A) o `docs/ANALISIS-TECNICO.md` §Camino B.
+Two APKs, built in the cloud (GitHub Actions). Open these links **on the phone**:
 
-Detalles completos del razonamiento y de cada eslabón en **`docs/ANALISIS-TECNICO.md`**.
+| App | Link |
+|---|---|
+| **RetroRazer Rumble Bridge** (our app) | [`apk-latest`](https://github.com/XipleETH/RetroRazer-/releases/download/apk-latest/RetroRazer-RumbleBridge-debug.apk) |
+| **RetroArch (patched)** | [`retroarch-latest`](https://github.com/XipleETH/RetroRazer-/releases/download/retroarch-latest/RetroArch-RetroRazer.apk) |
+
+## Setup
+
+1. Install both APKs. *(If you already have official RetroArch, uninstall it first —
+   same package, different signature.)*
+2. Open **RetroRazer Rumble Bridge** → **Start rumble bridge** (a persistent
+   notification appears).
+3. **Razer Nexus** → Audio Haptics = **High**. Turn media volume up.
+4. In the patched RetroArch, load a PS1 game and in *Core options* set the
+   controller to **DualShock/analog** and **Rumble = ON** (see
+   [`docs/RETROARCH-CONFIG.md`](docs/RETROARCH-CONFIG.md)).
+5. Play — the Kishi vibrates with the game's real rumble.
+
+---
+
+## What's in this repo
+
+- **`rumble-bridge/`** — the Android app: `HapticEngine` (audio→haptics),
+  `RumbleHapticService` (the bridge), and a **Haptic Lab** to calibrate the signal.
+- **`patches/retroarch/`** — the smali injection (`RRBridge.smali`) and the script
+  that patches the official RetroArch APK.
+- **`.github/workflows/`** — cloud builds: `build-apk.yml` (our app) and
+  `patch-retroarch.yml` (downloads, patches, signs and publishes RetroArch).
+- **`docs/`** — technical analysis and setup guides.
+
+## Build / rebuild
+
+Everything builds in the cloud on push; APKs are published to rolling releases
+(`apk-latest`, `retroarch-latest`). To rebuild the patched RetroArch manually, run
+the **Patch RetroArch** workflow from the Actions tab (optionally passing a
+different `apk_url`).
+
+## Honest limitations
+
+- The haptic pulse is mixed into the audio stream (a faint low hum during rumble);
+  tune frequency/waveform in the Haptic Lab if it bothers you.
+- The RetroArch patch relies on its `doVibrate` method; a future RetroArch version
+  could rename it (the workflow fails loudly if so).
+- Debug-signed, so it can't coexist with official RetroArch.
+
+## Credits
+
+Built collaboratively with Claude Code. Razer, Kishi, HyperSense, Nexus and
+RetroArch are trademarks of their respective owners; this is an independent,
+non-commercial project.
