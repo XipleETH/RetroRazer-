@@ -1,7 +1,11 @@
 package com.retrorazer.rumblebridge
 
 import android.app.Activity
+import android.content.Context
 import android.graphics.Typeface
+import android.media.AudioAttributes
+import android.media.AudioManager
+import android.os.Build
 import android.os.Bundle
 import android.view.Gravity
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
@@ -13,33 +17,38 @@ import android.widget.SeekBar
 import android.widget.TextView
 
 /**
- * Laboratorio háptico: genera tonos graves por audio para encontrar el ajuste
- * (frecuencia / forma de onda / amplitud / salida) que hace vibrar mejor los
- * motores del Kishi vía Audio Haptics. El ajuste ganador se llevará luego a
- * RetroArch.
+ * Laboratorio háptico: busca la señal de audio que hace vibrar mejor el Kishi
+ * vía Audio Haptics. Empieza reproduciendo PULSOS graves (lo que más dispara el
+ * háptico). El ajuste ganador se llevará luego a RetroArch.
  *
- * REQUISITOS para sentir algo:
- *  - Razer Nexus con Audio Haptics ENCENDIDO (sensibilidad Alta).
- *  - Volumen de multimedia arriba.
- *  - Kishi V2 Pro conectado.
+ * REQUISITOS: Razer Nexus con Audio Haptics ON (Alta), volumen de multimedia
+ * arriba, Kishi conectado, y abrir esta app DESDE Nexus.
  */
 class HapticLabActivity : Activity() {
 
     private val engine = HapticEngine()
 
-    private var freqHz = 50
-    private var ampPct = 80
-    private var continuous = false
+    private var freqHz = 60
+    private var ampPct = 90
+    private var continuous = true   // arranca sonando para feedback inmediato
 
     private lateinit var freqLabel: TextView
     private lateinit var ampLabel: TextView
     private lateinit var waveBtn: Button
+    private lateinit var modeBtn: Button
     private lateinit var outBtn: Button
     private lateinit var contBtn: Button
     private lateinit var readout: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Permite que otras apps (Razer Nexus) capturen nuestro audio para
+        // convertirlo en háptica.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            am.allowedCapturePolicy = AudioAttributes.ALLOW_CAPTURE_BY_ALL
+        }
 
         val root = ScrollView(this)
         val col = LinearLayout(this).apply {
@@ -50,10 +59,29 @@ class HapticLabActivity : Activity() {
 
         col.addView(title("🔬 Laboratorio háptico"))
         col.addView(body(
-            "Genera un tono grave por audio. Con Razer Nexus (Audio Haptics = Alta) " +
-            "y el volumen de multimedia arriba, ajusta hasta que el Kishi vibre fuerte " +
-            "y limpio. Anota el ajuste ganador y me lo pasas."
+            "Al abrir ya está reproduciendo PULSOS graves. Con Razer Nexus " +
+            "(Audio Haptics = Alta) y el volumen arriba, busca la señal que haga " +
+            "vibrar el Kishi. Prueba MODO = PULSO y RUIDO (disparan mejor que un " +
+            "tono puro). Anota el ajuste que funcione y me lo pasas."
         ))
+
+        // Prueba de audio audible
+        col.addView(button("🔊 Sonido de prueba (¿lo oyes?)") {
+            engine.playAudibleBeep()
+        })
+
+        // Modo de señal
+        modeBtn = button("Modo: PULSO (recomendado)") {
+            val next = when (engine.currentMode) {
+                HapticEngine.Mode.PULSE -> HapticEngine.Mode.NOISE
+                HapticEngine.Mode.NOISE -> HapticEngine.Mode.TONE
+                HapticEngine.Mode.TONE -> HapticEngine.Mode.PULSE
+            }
+            engine.setMode(next)
+            modeBtn.text = "Modo: ${modeName(next)}"
+            updateLabels()
+        }
+        col.addView(modeBtn)
 
         // Frecuencia
         freqLabel = body("")
@@ -73,7 +101,7 @@ class HapticLabActivity : Activity() {
             updateLabels()
         })
 
-        // Forma de onda
+        // Forma de onda (para PULSO/TONO)
         waveBtn = button("Forma de onda: SINE") {
             val next = when (engine.currentWave) {
                 HapticEngine.Wave.SINE -> HapticEngine.Wave.SQUARE
@@ -86,7 +114,7 @@ class HapticLabActivity : Activity() {
         }
         col.addView(waveBtn)
 
-        // Salida MEDIA/GAME (por si el audio-háptico solo capta una)
+        // Salida MEDIA/GAME
         outBtn = button("Salida de audio: MEDIA") {
             val next = if (engine.currentOut == HapticEngine.Out.MEDIA)
                 HapticEngine.Out.GAME else HapticEngine.Out.MEDIA
@@ -96,21 +124,18 @@ class HapticLabActivity : Activity() {
         }
         col.addView(outBtn)
 
-        // Tono continuo ON/OFF
-        contBtn = button("▶ Tono continuo: OFF") {
+        // Reproducir ON/OFF
+        contBtn = button("⏸ Reproduciendo: ON") {
             continuous = !continuous
             engine.setAmplitude(if (continuous) ampPct / 100.0 else 0.0)
-            contBtn.text = if (continuous) "⏸ Tono continuo: ON" else "▶ Tono continuo: OFF"
+            contBtn.text = if (continuous) "⏸ Reproduciendo: ON" else "▶ Reproduciendo: OFF"
         }
         col.addView(contBtn)
 
-        // Golpe / simular rumble
+        // Golpe único
         col.addView(button("💥 Golpe (simular rumble PS1)") {
             engine.playRumblePattern()
         })
-
-        // Mantener para vibrar (pulsar y sostener)
-        col.addView(holdButton())
 
         col.addView(title("Ajuste actual (repórtame esto)"))
         readout = mono("")
@@ -123,7 +148,7 @@ class HapticLabActivity : Activity() {
     override fun onResume() {
         super.onResume()
         engine.start()
-        if (continuous) engine.setAmplitude(ampPct / 100.0)
+        engine.setAmplitude(if (continuous) ampPct / 100.0 else 0.0)
     }
 
     override fun onPause() {
@@ -131,34 +156,20 @@ class HapticLabActivity : Activity() {
         engine.stop()
     }
 
+    private fun modeName(m: HapticEngine.Mode) = when (m) {
+        HapticEngine.Mode.PULSE -> "PULSO (recomendado)"
+        HapticEngine.Mode.NOISE -> "RUIDO (explosión)"
+        HapticEngine.Mode.TONE -> "TONO continuo"
+    }
+
     private fun updateLabels() {
         freqLabel.text = "Frecuencia: $freqHz Hz"
         ampLabel.text = "Amplitud: $ampPct %"
-        readout.text = "freq=$freqHz Hz   amp=$ampPct %   onda=${engine.currentWave.name}   " +
-                "salida=${engine.currentOut.name}"
+        readout.text = "modo=${engine.currentMode}   freq=$freqHz Hz   amp=$ampPct %   " +
+                "onda=${engine.currentWave.name}   salida=${engine.currentOut.name}"
     }
 
     // ---- helpers de UI ----
-
-    private fun holdButton(): Button = Button(this).apply {
-        text = "👉 Mantener pulsado para vibrar"
-        setAllCaps(false)
-        gravity = Gravity.CENTER
-        setOnTouchListener { v, ev ->
-            when (ev.actionMasked) {
-                android.view.MotionEvent.ACTION_DOWN -> {
-                    engine.setAmplitude(ampPct / 100.0); true
-                }
-                android.view.MotionEvent.ACTION_UP,
-                android.view.MotionEvent.ACTION_CANCEL -> {
-                    if (!continuous) engine.setAmplitude(0.0)
-                    v.performClick(); true
-                }
-                else -> false
-            }
-        }
-        layoutParams = LinearLayout.LayoutParams(MATCH_PARENT, dp(64)).apply { topMargin = dp(8) }
-    }
 
     private fun seek(min: Int, max: Int, value: Int, onChange: (Int) -> Unit) =
         SeekBar(this).apply {
