@@ -2,6 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Servicio en primer plano para el puente de rumble (audio en segundo plano) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- USB Host: para hablar por HID con el control (Camino B / descubrimiento) -->
     <uses-feature android:name="android.hardware.usb.host" android:required="false" />
 
@@ -33,5 +37,10 @@
             android:name=".HapticLabActivity"
             android:exported="false"
             android:label="Laboratorio háptico" />
+
+        <service
+            android:name=".RumbleHapticService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
     </application>
 </manifest>

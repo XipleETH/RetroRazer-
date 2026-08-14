@@ -101,6 +101,22 @@ class MainActivity : Activity() {
         addButton("🔬 Laboratorio háptico (audio → vibración)") {
             startActivity(Intent(this, HapticLabActivity::class.java))
         }
+        addButton("🟢 Iniciar puente de rumble (servicio)") {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1)
+            }
+            val svc = Intent(this, RumbleHapticService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(svc)
+            else startService(svc)
+            log("Puente de rumble INICIADO. Deja esto abierto y prueba el simulador o RetroArch.")
+        }
+        addButton("🔴 Detener puente de rumble") {
+            stopService(Intent(this, RumbleHapticService::class.java))
+            log("Puente de rumble detenido.")
+        }
+        addButton("🎮 Simular rumble entrante (prueba del puente)") {
+            simulateIncomingRumble()
+        }
 
         // --- Controles de entrada (Camino A) ---
         addTitle("1) Controles detectados (vibrador estándar)")
@@ -193,6 +209,28 @@ class MainActivity : Activity() {
 
     private fun log(msg: String) {
         logView.append(msg + "\n")
+    }
+
+    /** Envía un broadcast de rumble a nuestro propio servicio (formato de RetroArch). */
+    private fun sendRumble(strength: Int, effect: Int) {
+        val i = Intent(RumbleHapticService.ACTION_RUMBLE).setPackage(packageName)
+        i.putExtra("s", strength)
+        i.putExtra("e", effect)
+        sendBroadcast(i)
+    }
+
+    /** Simula un rumble de juego (golpe fuerte que decae) para probar el puente. */
+    private fun simulateIncomingRumble() {
+        log("Simulando rumble entrante… (inicia el puente primero, con Nexus/Audio Haptics ON)")
+        Thread {
+            var s = 60000
+            while (s > 800) {
+                sendRumble(s, 0)
+                try { Thread.sleep(60) } catch (_: InterruptedException) {}
+                s = (s * 0.85).toInt()
+            }
+            sendRumble(0, 0)
+        }.start()
     }
 
     private fun addTitle(t: String) {
