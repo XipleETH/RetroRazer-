@@ -1,6 +1,8 @@
 <!-- 言語: 日本語 -->
 [English](README.md) · [Español](README.es.md) · **日本語**
 
+![RetroRazer](docs/assets/retrorazer-hero.png)
+
 # RetroRazer
 
 **Android の RetroArch で、Razer Kishi V2 Pro に本物のゲーム内ランブルを。**

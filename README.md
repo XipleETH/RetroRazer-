@@ -1,6 +1,8 @@
 <!-- Language: English (default) -->
 **English** · [Español](README.es.md) · [日本語](README.ja.md)
 
+![RetroRazer](docs/assets/retrorazer-hero.png)
+
 # RetroRazer
 
 **Real in-game rumble for the Razer Kishi V2 Pro in RetroArch on Android.**
