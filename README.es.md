@@ -104,8 +104,15 @@ ejecuta el workflow **Patch RetroArch** desde la pestaña Actions (puedes pasar 
   renombrarlo (el workflow avisa fallando).
 - Firma de depuración: no puede coexistir con el RetroArch oficial.
 
-## Créditos
+## Licencia
 
-Construido en colaboración con Claude Code. Razer, Kishi, HyperSense, Nexus y
-RetroArch son marcas de sus respectivos dueños; este es un proyecto independiente y
-sin fines comerciales.
+- **El código propio de RetroRazer** (la app en `rumble-bridge/` y las
+  herramientas en `patches/`) se publica bajo la **Licencia MIT** — ver
+  [`LICENSE`](LICENSE).
+- El **APK de RetroArch parcheado** que se publica en las releases es una *build
+  modificada de RetroArch* bajo la **GNU GPLv3**. Su código fuente correspondiente
+  es RetroArch original (<https://github.com/libretro/RetroArch>) más el parche en
+  [`patches/retroarch/`](patches/retroarch/). Es una build **no oficial**.
+- Razer, Kishi, HyperSense, Nexus y RetroArch son marcas de sus respectivos
+  dueños. Proyecto independiente y sin fines comerciales, no afiliado a Razer ni a
+  RetroArch. Construido en colaboración con Claude Code.

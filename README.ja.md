@@ -102,7 +102,15 @@ push するたびにクラウドでビルドされ、APK はローリングリ�
   名前が変わる可能性があります（その場合ワークフローは明示的に失敗します）。
 - デバッグ署名のため、公式 RetroArch とは共存できません。
 
-## クレジット
+## ライセンス
 
-Claude Code との協働で開発。Razer、Kishi、HyperSense、Nexus、RetroArch は各所有者
-の商標です。本プロジェクトは独立した非営利プロジェクトです。
+- **RetroRazer 独自のコード**（`rumble-bridge/` のアプリと `patches/` のツール）は
+  **MIT ライセンス**で公開しています — [`LICENSE`](LICENSE) を参照。
+- リリースで公開している**パッチ済み RetroArch APK** は RetroArch の*改変ビルド*で、
+  **GNU GPLv3** で配布されます。対応するソースは、本家 RetroArch
+  （<https://github.com/libretro/RetroArch>）に本リポジトリ
+  [`patches/retroarch/`](patches/retroarch/) の改変を加えたものです。**非公式**
+  ビルドです。
+- Razer、Kishi、HyperSense、Nexus、RetroArch は各所有者の商標です。本プロジェクトは
+  独立した非営利プロジェクトであり、Razer や RetroArch とは提携していません。
+  Claude Code との協働で開発。

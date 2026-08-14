@@ -114,5 +114,11 @@ jobs:
             3. En este RetroArch, activa Rumble en el núcleo de PS1 (mando DualShock).
             Nota: si ya tienes el RetroArch oficial instalado, desinstálalo antes
             (firma distinta, mismo package).
+
+            ---
+            Build NO OFICIAL y modificada de RetroArch, distribuida bajo GNU GPLv3.
+            Fuente correspondiente: RetroArch original (https://github.com/libretro/RetroArch)
+            + el parche en patches/retroarch/ de este repositorio. No afiliado a
+            RetroArch/libretro ni a Razer.
           prerelease: true
           files: RetroArch-RetroRazer.apk

@@ -102,8 +102,14 @@ different `apk_url`).
   could rename it (the workflow fails loudly if so).
 - Debug-signed, so it can't coexist with official RetroArch.
 
-## Credits
+## License
 
-Built collaboratively with Claude Code. Razer, Kishi, HyperSense, Nexus and
-RetroArch are trademarks of their respective owners; this is an independent,
-non-commercial project.
+- **RetroRazer's own code** (the app in `rumble-bridge/` and the tooling in
+  `patches/`) is released under the **MIT License** — see [`LICENSE`](LICENSE).
+- The **patched RetroArch APK** published in releases is a *modified build of
+  RetroArch* under the **GNU GPLv3**. Its corresponding source is upstream
+  RetroArch (<https://github.com/libretro/RetroArch>) plus the patch in
+  [`patches/retroarch/`](patches/retroarch/). It is an **unofficial** build.
+- Razer, Kishi, HyperSense, Nexus and RetroArch are trademarks of their
+  respective owners. Independent, non-commercial project, not affiliated with
+  Razer or RetroArch. Built collaboratively with Claude Code.
