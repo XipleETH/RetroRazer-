@@ -2,6 +2,13 @@
 
 **Objetivo:** hacer que las vibraciones (rumble) de los juegos originales —PlayStation 1, Game Boy Advance, etc.— emulados en **RetroArch para Android** lleguen a los motores del control **Razer** con tecnología **Sensa HD Haptics** (Razer Kishi Ultra), que hoy no vibran aunque la caja diga que deberían.
 
+> ## 📣 Hallazgo confirmado (Kishi V2 Pro)
+> La app de diagnóstico, con un **Razer Kishi V2 Pro** real, reportó **`vibrador
+> estándar: NO`**. Este control usa **HyperSense / Audio Haptics**: vibra a partir
+> del **audio del juego**, no de comandos de rumble. Por eso no vibra en RetroArch
+> por la vía normal. **La solución correcta está en → [`docs/SOLUCION-KISHI-V2PRO.md`](docs/SOLUCION-KISHI-V2PRO.md)**
+> (configurar Razer Nexus Audio Haptics, o construir un puente rumble→audio).
+
 Este repositorio contiene:
 
 1. **`rumble-bridge/`** — una app Android nativa de **diagnóstico y prueba de rumble**. Es la pieza clave: detecta el control, dice exactamente *cómo* expone (o no) sus motores a Android, y **hace vibrar los motores** para comprobarlo. Sin esto trabajaríamos a ciegas.
