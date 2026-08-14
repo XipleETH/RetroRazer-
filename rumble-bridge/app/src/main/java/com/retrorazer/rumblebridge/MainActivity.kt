@@ -98,6 +98,9 @@ class MainActivity : Activity() {
                 "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
 
         addButton("↻ Refrescar") { refresh() }
+        addButton("🔬 Laboratorio háptico (audio → vibración)") {
+            startActivity(Intent(this, HapticLabActivity::class.java))
+        }
 
         // --- Controles de entrada (Camino A) ---
         addTitle("1) Controles detectados (vibrador estándar)")

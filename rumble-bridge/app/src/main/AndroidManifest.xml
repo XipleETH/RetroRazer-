@@ -27,5 +27,10 @@
                 android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
                 android:resource="@xml/usb_device_filter" />
         </activity>
+
+        <activity
+            android:name=".HapticLabActivity"
+            android:exported="false"
+            android:label="Laboratorio háptico" />
     </application>
 </manifest>
