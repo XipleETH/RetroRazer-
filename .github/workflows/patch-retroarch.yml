@@ -1,0 +1,118 @@
+name: Patch RetroArch
+
+# Descarga el APK oficial de RetroArch (aarch64), le inyecta el puente de rumble
+# de RetroRazer (una llamada en doVibrate que emite un broadcast), lo reconstruye,
+# firma y publica con enlace directo. Reutiliza el RetroArch oficial completo.
+
+on:
+  workflow_dispatch:
+    inputs:
+      apk_url:
+        description: "URL del APK oficial de RetroArch aarch64 (opcional)"
+        required: false
+        default: ""
+  push:
+    branches: [ claude/razer-sense-vibration-qswmy8 ]
+    paths:
+      - 'patches/retroarch/**'
+      - '.github/workflows/patch-retroarch.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: build-tools
+        run: sdkmanager "build-tools;34.0.0"
+
+      - name: Descargar apktool
+        run: |
+          curl -fL -o apktool.jar \
+            https://github.com/iBotPeaches/Apktool/releases/download/v2.9.3/apktool_2.9.3.jar
+          java -jar apktool.jar --version
+
+      - name: Descargar RetroArch oficial (aarch64)
+        run: |
+          set -e
+          CANDIDATES=(
+            "${{ github.event.inputs.apk_url }}"
+            "https://buildbot.libretro.com/stable/1.20.0/android/RetroArch_aarch64.apk"
+            "https://buildbot.libretro.com/stable/1.19.1/android/RetroArch_aarch64.apk"
+            "https://buildbot.libretro.com/stable/1.19.0/android/RetroArch_aarch64.apk"
+            "https://buildbot.libretro.com/nightly/android/RetroArch_aarch64.apk"
+          )
+          ok=""
+          for u in "${CANDIDATES[@]}"; do
+            [ -z "$u" ] && continue
+            echo "Intentando: $u"
+            if curl -fL -o retroarch.apk "$u" && unzip -t retroarch.apk >/dev/null 2>&1; then
+              echo "APK válido desde: $u"; echo "$u" > used_url.txt; ok=1; break
+            fi
+            echo "  (falló o no es un ZIP válido)"
+          done
+          if [ -z "$ok" ]; then
+            echo "ERROR: no se pudo descargar un APK de RetroArch válido."
+            echo "Reejecuta el workflow (Run workflow) indicando apk_url con la versión correcta de buildbot.libretro.com."
+            exit 1
+          fi
+          ls -la retroarch.apk
+
+      - name: Decodificar (recursos en crudo con -r)
+        run: java -jar apktool.jar d -r -f -o ra retroarch.apk
+
+      - name: Inyectar puente de rumble
+        run: python3 patches/retroarch/patch_retroarch.py ra patches/retroarch/RRBridge.smali
+
+      - name: Reconstruir
+        run: java -jar apktool.jar b -o retroarch-unsigned.apk ra
+
+      - name: Firmar y alinear
+        run: |
+          set -e
+          BT="$ANDROID_HOME/build-tools/34.0.0"
+          keytool -genkeypair -v -keystore debug.keystore -storepass android \
+            -alias rr -keypass android -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=RetroRazer, O=RetroRazer, C=US"
+          "$BT/zipalign" -f -p 4 retroarch-unsigned.apk RetroArch-RetroRazer.apk
+          "$BT/apksigner" sign --ks debug.keystore --ks-pass pass:android \
+            --key-pass pass:android RetroArch-RetroRazer.apk
+          "$BT/apksigner" verify --verbose RetroArch-RetroRazer.apk
+          ls -la RetroArch-RetroRazer.apk
+
+      - name: Subir artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: RetroArch-RetroRazer
+          path: RetroArch-RetroRazer.apk
+          if-no-files-found: error
+
+      - name: Publicar release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: retroarch-latest
+          name: RetroArch parcheado (RetroRazer)
+          body: |
+            RetroArch oficial (aarch64) con el puente de rumble de RetroRazer inyectado.
+
+            Instálalo JUNTO con la app RetroRazer Rumble Bridge:
+            1. Instala/abre RetroRazer Rumble Bridge y pulsa "Iniciar puente de rumble".
+            2. Ten Razer Nexus con Audio Haptics = Alta.
+            3. En este RetroArch, activa Rumble en el núcleo de PS1 (mando DualShock).
+            Nota: si ya tienes el RetroArch oficial instalado, desinstálalo antes
+            (firma distinta, mismo package).
+          prerelease: true
+          files: RetroArch-RetroRazer.apk
