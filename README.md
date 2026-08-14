@@ -5,11 +5,12 @@
 
 # RetroRazer
 
-**Real in-game rumble for the Razer Kishi V2 Pro in RetroArch on Android.**
+**Real, game-driven rumble for the Razer Kishi V2 Pro in RetroArch on Android.**
 
-Turns the actual rumble commands of emulated games (PlayStation 1, GBA, and more)
-into vibration on the **Razer Kishi V2 Pro**'s HyperSense haptic motors — something
-the controller's box promises but that RetroArch never delivered on its own.
+The Kishi V2 Pro's HyperSense haptics only react to the game's **audio** — not its
+actual rumble. RetroRazer feeds the motors the **real rumble command** from the
+emulator (PlayStation 1, GBA, and more), so the controller vibrates with the
+*action*, not the soundtrack.
 
 > Status: **working and validated on real hardware** (Razer Kishi V2 Pro, RetroArch
 > 1.20.0 aarch64). It faithfully reproduces the game's rumble, cleanly separated

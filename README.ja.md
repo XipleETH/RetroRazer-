@@ -5,11 +5,12 @@
 
 # RetroRazer
 
-**Android の RetroArch で、Razer Kishi V2 Pro に本物のゲーム内ランブルを。**
+**Android の RetroArch で、ゲーム本来のランブルを Razer Kishi V2 Pro へ。**
 
-エミュレートされたゲーム（PlayStation 1、GBA など）の実際のランブル命令を、
-**Razer Kishi V2 Pro** の HyperSense 触覚モーターの振動へと変換します。これは
-コントローラーの箱が約束しているのに、RetroArch 単体では実現できなかった機能です。
+Kishi V2 Pro の HyperSense 触覚はゲームの**音声**にしか反応せず、ゲーム本来の
+ランブルには反応しません。RetroRazer はエミュレーター（PlayStation 1、GBA など）
+の**実際のランブル命令**をモーターに送り込み、サウンドトラックではなく*アクション*
+に合わせて振動させます。
 
 > ステータス: **実機で動作確認済み**（Razer Kishi V2 Pro、RetroArch 1.20.0
 > aarch64）。ゲームのランブルを忠実に再現し、ゲーム音声とはきれいに分離されます。
