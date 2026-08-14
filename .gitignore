@@ -10,5 +10,4 @@ captures/
 *.apk
 *.aab
 *.keystore
-# Wrapper binario (se regenera con `gradle wrapper` o Android Studio)
-gradle/wrapper/gradle-wrapper.jar
+# El jar del Gradle wrapper SÍ se versiona (para que CI y tu PC compilen sin pasos extra).

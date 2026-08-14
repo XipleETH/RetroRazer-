@@ -1,0 +1,75 @@
+name: Build APK
+
+# Compila el APK de rumble-bridge en la nube (los runners de GitHub sí tienen
+# acceso a Google Maven / Android SDK) y lo publica con un enlace de descarga
+# directo, para instalarlo en el celular sin PC ni Android Studio.
+
+on:
+  push:
+    branches:
+      - claude/razer-sense-vibration-qswmy8
+      - main
+    paths:
+      - 'rumble-bridge/**'
+      - '.github/workflows/build-apk.yml'
+  workflow_dispatch: {}   # permite lanzarlo a mano desde la pestaña Actions
+
+permissions:
+  contents: write          # para publicar el APK como asset de una release
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Configurar Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Instalar componentes del SDK
+        run: sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+
+      - name: Permisos de gradlew
+        working-directory: rumble-bridge
+        run: chmod +x ./gradlew
+
+      - name: Compilar APK de depuración
+        working-directory: rumble-bridge
+        run: ./gradlew assembleDebug --stacktrace --no-daemon
+
+      - name: Renombrar APK
+        run: |
+          mkdir -p dist
+          cp rumble-bridge/app/build/outputs/apk/debug/app-debug.apk \
+             dist/RetroRazer-RumbleBridge-debug.apk
+
+      - name: Subir APK como artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: RetroRazer-RumbleBridge-debug
+          path: dist/RetroRazer-RumbleBridge-debug.apk
+          if-no-files-found: error
+
+      # Publica un enlace de descarga estable (misma release 'apk-latest' que se
+      # actualiza en cada build). Útil para abrir e instalar directo en el móvil.
+      - name: Publicar release rodante con el APK
+        if: github.event_name != 'pull_request'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-latest
+          name: APK más reciente (rumble-bridge)
+          body: |
+            APK de depuración de **RetroRazer Rumble Bridge**, compilado
+            automáticamente desde la rama de desarrollo.
+
+            Descárgalo e instálalo en el celular (activa "instalar apps
+            desconocidas" para el navegador/archivos). Commit: ${{ github.sha }}
+          prerelease: true
+          files: dist/RetroRazer-RumbleBridge-debug.apk
