@@ -97,7 +97,7 @@ class RumbleHapticService : Service() {
         nm.createNotificationChannel(channel)
 
         val modeText = if (directMode)
-            "Modo DIRECTO (motores del control) — sin Nexus"
+            "Modo DIRECTO: ${rumbler.deviceName() ?: "control"} — sin Nexus"
         else
             "Modo AUDIO (HyperSense) — requiere Nexus"
 
