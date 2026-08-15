@@ -8,8 +8,11 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
+import android.provider.Settings
 import android.text.method.ScrollingMovementMethod
 import android.view.Gravity
 import android.view.ViewGroup
@@ -114,6 +117,9 @@ class MainActivity : Activity() {
             stopService(Intent(this, RumbleHapticService::class.java))
             log("Puente de rumble detenido.")
         }
+        addButton("🔋 Excluir de optimización de batería (evita que el puente se muera)") {
+            requestBatteryExclusion()
+        }
         addButton("🎮 Simular rumble entrante (prueba del puente)") {
             simulateIncomingRumble()
         }
@@ -209,6 +215,29 @@ class MainActivity : Activity() {
 
     private fun log(msg: String) {
         logView.append(msg + "\n")
+    }
+
+    /** Pide excluir la app de la optimización de batería (para que el servicio no muera). */
+    private fun requestBatteryExclusion() {
+        val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+        if (pm.isIgnoringBatteryOptimizations(packageName)) {
+            log("Ya está excluida de la optimización de batería. 👍")
+            return
+        }
+        try {
+            startActivity(
+                Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                    .setData(Uri.parse("package:$packageName"))
+            )
+        } catch (e: Exception) {
+            // Respaldo: abre la lista de optimización de batería
+            try {
+                startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                log("Busca 'RetroRazer' en la lista y quítale la optimización.")
+            } catch (e2: Exception) {
+                log("No se pudo abrir el ajuste de batería: ${e2.message}")
+            }
+        }
     }
 
     /** Envía un broadcast de rumble a nuestro propio servicio (formato de RetroArch). */

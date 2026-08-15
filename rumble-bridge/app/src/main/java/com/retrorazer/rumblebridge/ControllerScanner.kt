@@ -70,9 +70,9 @@ object ControllerScanner {
     private fun vibratorIdsOf(dev: InputDevice): List<Int> {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val vm = dev.vibratorManager ?: return emptyList()
-            val ids = vm.vibratorIds
-            // Filtra a los que realmente tienen motor
-            return ids.filter { vm.getVibrator(it).hasVibrator() }.toList()
+            // NO filtramos por hasVibrator(): algunos controles (Kishi) exponen
+            // motores por VibratorManager aunque hasVibrator() sea false.
+            return vm.vibratorIds.toList()
         }
         @Suppress("DEPRECATION")
         val v = dev.vibrator
@@ -92,8 +92,7 @@ object ControllerScanner {
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val vm: VibratorManager = dev.vibratorManager ?: return false
-            val ids = vm.vibratorIds.filter { vm.getVibrator(it).hasVibrator() }
-            if (ids.isEmpty()) return false
+            if (vm.vibratorIds.isEmpty()) return false
             val effect = VibrationEffect.createOneShot(durationMs, amp)
             // Emite a todos los motores del mando a la vez
             val combined = CombinedVibration.createParallel(effect)

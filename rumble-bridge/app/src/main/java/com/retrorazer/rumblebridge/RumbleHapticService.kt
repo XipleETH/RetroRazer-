@@ -13,11 +13,14 @@ import android.os.Build
 import android.os.IBinder
 
 /**
- * Servicio en primer plano que es la mitad "receptora" del puente de rumble.
+ * Servicio en primer plano: recibe el rumble real de RetroArch (broadcast) y lo
+ * convierte en vibración del control.
  *
- * RetroArch (parcheado) emite un broadcast con la fuerza del rumble del juego;
- * aquí lo recibimos y lo convertimos en vibración usando HapticEngine (que el
- * Audio Haptics del Kishi transforma en movimiento de los motores).
+ * Dos modos, elegidos automáticamente al arrancar:
+ *   - DIRECTO: si el control expone motores por la API estándar (VibratorManager),
+ *     vibra los motores directamente. Sin audio, sin Nexus. (Preferido.)
+ *   - AUDIO: si no hay vibrador estándar, genera un pulso de audio que el Audio
+ *     Haptics del Kishi convierte en vibración (requiere Nexus). (Respaldo.)
  *
  * Broadcast esperado:
  *   acción : com.retrorazer.rumblebridge.RUMBLE
@@ -26,33 +29,45 @@ import android.os.IBinder
  */
 class RumbleHapticService : Service() {
 
-    private val engine = HapticEngine()
+    private val engine = HapticEngine()          // respaldo por audio
+    private val rumbler = ControllerRumbler()     // vibración directa
+    private var directMode = false
 
-    @Volatile private var strong = 0.0
-    @Volatile private var weak = 0.0
+    @Volatile private var strongS = 0            // 0..65535
+    @Volatile private var weakS = 0
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (intent.action != ACTION_RUMBLE) return
-            val s = intent.getIntExtra("s", 0).coerceIn(0, 65535) / 65535.0
+            val s = intent.getIntExtra("s", 0).coerceIn(0, 65535)
             val e = intent.getIntExtra("e", 0)
-            if (e == 1) weak = s else strong = s
-            // Un solo motor háptico: combinamos ambos motores del DualShock.
-            engine.setAmplitude(maxOf(strong, weak))
+            if (e == 1) weakS = s else strongS = s
+
+            if (directMode) {
+                val amp = s shr 8               // 0..255
+                if (amp <= 0) {
+                    if (strongS == 0 && weakS == 0) rumbler.cancel()
+                } else {
+                    rumbler.vibrate(e, amp, SUSTAIN_MS)
+                }
+            } else {
+                engine.setAmplitude(maxOf(strongS, weakS) / 65535.0)
+            }
         }
     }
 
     override fun onCreate() {
         super.onCreate()
 
-        engine.setMode(HapticEngine.Mode.PULSE)
-        engine.setFreq(DEFAULT_FREQ)
-        engine.setWave(HapticEngine.Wave.SINE)
-        engine.start()
-        engine.setAmplitude(0.0)
+        directMode = rumbler.available()
+        if (!directMode) {
+            engine.setMode(HapticEngine.Mode.PULSE)
+            engine.setFreq(55.0)
+            engine.start()
+            engine.setAmplitude(0.0)
+        }
 
         val filter = IntentFilter(ACTION_RUMBLE)
-        // Debe ser EXPORTED: el broadcast viene de otra app (RetroArch).
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
         } else {
@@ -69,12 +84,11 @@ class RumbleHapticService : Service() {
 
     override fun onDestroy() {
         try { unregisterReceiver(receiver) } catch (_: Exception) {}
-        engine.stop()
+        if (directMode) rumbler.cancel() else engine.stop()
         super.onDestroy()
     }
 
     private fun startForegroundCompat() {
-        // minSdk 26 (O): NotificationChannel y Notification.Builder(ctx, channel) siempre disponibles.
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val channel = NotificationChannel(
             CHANNEL_ID, "Puente de rumble", NotificationManager.IMPORTANCE_LOW
@@ -82,9 +96,14 @@ class RumbleHapticService : Service() {
         channel.setSound(null, null)
         nm.createNotificationChannel(channel)
 
+        val modeText = if (directMode)
+            "Modo DIRECTO (motores del control) — sin Nexus"
+        else
+            "Modo AUDIO (HyperSense) — requiere Nexus"
+
         val notif: Notification = Notification.Builder(this, CHANNEL_ID)
             .setContentTitle("RetroRazer — puente de rumble activo")
-            .setContentText("Convirtiendo el rumble del juego en vibración del Kishi")
+            .setContentText(modeText)
             .setSmallIcon(android.R.drawable.ic_media_play)
             .setOngoing(true)
             .build()
@@ -100,6 +119,6 @@ class RumbleHapticService : Service() {
         const val ACTION_RUMBLE = "com.retrorazer.rumblebridge.RUMBLE"
         private const val CHANNEL_ID = "rumble_bridge"
         private const val NOTIF_ID = 1
-        private const val DEFAULT_FREQ = 55.0
+        private const val SUSTAIN_MS = 300L
     }
 }
