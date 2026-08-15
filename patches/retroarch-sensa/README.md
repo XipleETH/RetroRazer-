@@ -57,6 +57,16 @@ apksigner sign --ks debug.keystore --ks-pass pass:android RetroArch-RetroRazer.a
 Iterar solo el streamer (afinar vibración) es barato: recompila `RRSensa.java` →
 reemplaza `classes2.dex` → re-firma. No hace falta re-ensamblar el smali de RetroArch.
 
+## Feel / motores
+
+RRSensa maneja los **dos motores** del Kishi por separado: fuerte (libretro effect 0)
+y débil (effect 1), cada uno en su canal del frame de 64B. La fuerza del juego (rango
+real chico, ~0..255 en PS1, no 0..65535) se re-escala a amplitud con piso + curva para
+que los rumbles suaves se sientan y decaigan bien. Onda cuadrada (fuerte) o senoidal
+(suave). Todo es **ajustable en vivo** por broadcast `com.retrorazer.RRSENSA_TUNE`
+(extras int: `maxamp scalep floorp curvep freq wave weakgain swap testamp`), para
+calibrar el tacto sin recompilar. Logs con `adb logcat -s RRSensa`.
+
 ## Uso
 
 1. Instala este RetroArch parcheado (desinstala el oficial antes — misma package,
