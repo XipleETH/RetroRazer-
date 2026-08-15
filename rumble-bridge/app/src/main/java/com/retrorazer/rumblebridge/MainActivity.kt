@@ -39,16 +39,62 @@ class MainActivity : Activity() {
     private val ACTION_USB_PERMISSION = "com.retrorazer.rumblebridge.USB_PERMISSION"
     private var pendingSweepDevice: UsbDevice? = null
 
+    // Camino B dirigido: disparable desde adb con
+    //   am broadcast -a com.retrorazer.rumblebridge.HIDTEST -p com.retrorazer.rumblebridge \
+    //       --ei iface 3 --ei rid 0 --el hold 1500 --es data ffffffffffffffffffffffffffffffff
+    private val ACTION_HID_TEST = "com.retrorazer.rumblebridge.HIDTEST"
+    private var pendingHidTest: Bundle? = null
+
+    private val hidTestReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action != ACTION_HID_TEST) return
+            val dev = findRazer() ?: run { log("HIDTEST: no encuentro el Razer por USB."); return }
+            val b = Bundle().apply {
+                putString("op", intent.getStringExtra("op") ?: "blast")
+                putInt("iface", intent.getIntExtra("iface", 3))
+                putInt("rid", intent.getIntExtra("rid", 0))
+                putLong("hold", intent.getLongExtra("hold", 1500L))
+                putInt("amp", intent.getIntExtra("amp", 20000))
+                putInt("freq", intent.getIntExtra("freq", 150))
+                putInt("cks", intent.getIntExtra("cks", 2))
+                putString("data", intent.getStringExtra("data")
+                    ?: "ffffffffffffffffffffffffffffffff")
+            }
+            if (!usbManager.hasPermission(dev)) {
+                pendingHidTest = b
+                log("HIDTEST: pidiendo permiso USB… (acepta el diálogo)")
+                requestUsbPermission(dev)
+                return
+            }
+            runHidOp(dev, b)
+        }
+    }
+
     private val usbPermissionReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (intent.action != ACTION_USB_PERMISSION) return
             val granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
-            val device = pendingSweepDevice
-            if (granted && device != null) {
-                log("Permiso USB concedido para ${device.deviceName}.")
-                runSweepAsync(device)
-            } else {
+            if (!granted) {
+                pendingHidTest = null
+                pendingSweepDevice = null
                 log("Permiso USB denegado.")
+                return
+            }
+            val hid = pendingHidTest
+            val sweepDev = pendingSweepDevice
+            when {
+                hid != null -> {
+                    pendingHidTest = null
+                    val dev = findRazer()
+                    if (dev != null) {
+                        log("Permiso USB concedido. Ejecutando HIDTEST…")
+                        runHidOp(dev, hid)
+                    } else log("Permiso concedido pero ya no encuentro el Razer.")
+                }
+                sweepDev != null -> {
+                    log("Permiso USB concedido para ${sweepDev.deviceName}.")
+                    runSweepAsync(sweepDev)
+                }
             }
         }
     }
@@ -80,6 +126,7 @@ class MainActivity : Activity() {
     override fun onDestroy() {
         super.onDestroy()
         try { unregisterReceiver(usbPermissionReceiver) } catch (_: Exception) {}
+        try { unregisterReceiver(hidTestReceiver) } catch (_: Exception) {}
     }
 
     private fun registerUsbReceiver() {
@@ -90,6 +137,106 @@ class MainActivity : Activity() {
             @Suppress("UnspecifiedRegisterReceiverFlag")
             registerReceiver(usbPermissionReceiver, filter)
         }
+        // El disparador HID SÍ debe ser EXPORTED para poder lanzarlo desde adb.
+        val hidFilter = IntentFilter(ACTION_HID_TEST)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(hidTestReceiver, hidFilter, Context.RECEIVER_EXPORTED)
+        } else {
+            @Suppress("UnspecifiedRegisterReceiverFlag")
+            registerReceiver(hidTestReceiver, hidFilter)
+        }
+    }
+
+    private fun findRazer(): UsbDevice? =
+        usbManager.deviceList.values.firstOrNull { it.vendorId == ControllerInfo.RAZER_VENDOR_ID }
+
+    /** Convierte "ffaa01" (o "ff aa 01") en bytes. */
+    private fun hexToBytes(hex: String): ByteArray {
+        val clean = hex.filter { it.isLetterOrDigit() }
+        if (clean.length < 2) return ByteArray(0)
+        val out = ByteArray(clean.length / 2)
+        for (i in out.indices) {
+            val hi = Character.digit(clean[i * 2], 16)
+            val lo = Character.digit(clean[i * 2 + 1], 16)
+            out[i] = (((hi and 0xF) shl 4) or (lo and 0xF)).toByte()
+        }
+        return out
+    }
+
+    private fun runHidOp(dev: UsbDevice, b: Bundle) {
+        val op = b.getString("op") ?: "blast"
+        val iface = b.getInt("iface")
+        if (op == "direct") {
+            val hold = b.getLong("hold")
+            log("RUMBLE DIRECTO → enable(iface#3) + stream(ep0x3), hold=${hold}ms")
+            Thread {
+                try {
+                    val file = java.io.File(getExternalFilesDir(null), "frames.bin")
+                    val frames = ArrayList<ByteArray>()
+                    if (file.exists()) {
+                        val all = file.readBytes()
+                        var i = 0
+                        while (i + 64 <= all.size) { frames.add(all.copyOfRange(i, i + 64)); i += 64 }
+                    }
+                    runOnUiThread { log("frames.bin: ${frames.size} frames (${file.absolutePath})") }
+                    val res = rumbler.directRumble(dev, rumbler.hapticEnableSequence(), frames, hold) { line ->
+                        runOnUiThread { log(line) }
+                    }
+                    runOnUiThread { log(res) }
+                } catch (e: Exception) {
+                    runOnUiThread { log("direct error: ${e.message}") }
+                }
+            }.start()
+            return
+        }
+        if (op == "synth") {
+            val hold = b.getLong("hold")
+            val amp = b.getInt("amp")
+            val freq = b.getInt("freq")
+            val cks = b.getInt("cks")
+            log("SYNTH → enable + onda amp=$amp freq=${freq}Hz cks=$cks hold=${hold}ms")
+            Thread {
+                try {
+                    val res = rumbler.streamSynthRumble(
+                        dev, rumbler.hapticEnableSequence(), amp, freq, cks, hold
+                    ) { line -> runOnUiThread { log(line) } }
+                    runOnUiThread { log(res) }
+                } catch (e: Exception) { runOnUiThread { log("synth error: ${e.message}") } }
+            }.start()
+            return
+        }
+        if (op == "desc") {
+            log("HID descriptor → iface#$iface")
+            Thread {
+                try {
+                    rumbler.dumpReportDescriptor(dev, iface) { line -> runOnUiThread { log(line) } }
+                } catch (e: Exception) {
+                    runOnUiThread { log("descriptor error: ${e.message}") }
+                }
+            }.start()
+            return
+        }
+        val rid = b.getInt("rid")
+        val hold = b.getLong("hold")
+        val hex = b.getString("data") ?: ""
+        val payload = hexToBytes(hex)
+        log("HIDTEST → iface#$iface rid=$rid hold=${hold}ms data=$hex (${payload.size}B)")
+        Thread {
+            try {
+                rumbler.blast(dev, iface, rid, payload, hold) { line -> runOnUiThread { log(line) } }
+            } catch (e: Exception) {
+                runOnUiThread { log("HIDTEST error: ${e.message}") }
+            }
+        }.start()
+    }
+
+    private fun requestUsbPermission(device: UsbDevice) {
+        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+            PendingIntent.FLAG_MUTABLE else 0
+        val pi = PendingIntent.getBroadcast(
+            this, 0, Intent(ACTION_USB_PERMISSION).setPackage(packageName), flags
+        )
+        usbManager.requestPermission(device, pi)
     }
 
     /** Reconstruye toda la vista con el estado actual. */
@@ -206,13 +353,8 @@ class MainActivity : Activity() {
             return
         }
         pendingSweepDevice = device
-        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
-            PendingIntent.FLAG_MUTABLE else 0
-        val pi = PendingIntent.getBroadcast(
-            this, 0, Intent(ACTION_USB_PERMISSION).setPackage(packageName), flags
-        )
         log("Solicitando permiso USB para ${device.deviceName}…")
-        usbManager.requestPermission(device, pi)
+        requestUsbPermission(device)
     }
 
     private fun runSweepAsync(device: UsbDevice) {

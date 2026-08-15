@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ServiceInfo
+import android.hardware.usb.UsbManager
 import android.os.Build
 import android.os.IBinder
 import kotlin.math.sqrt
@@ -31,14 +32,27 @@ import kotlin.math.sqrt
 class RumbleHapticService : Service() {
 
     private val engine = HapticEngine()          // respaldo por audio
-    private val rumbler = ControllerRumbler()     // vibración directa
+    private val rumbler = ControllerRumbler()     // vibración directa (vibrador estándar)
     private var directMode = false
+
+    // Modo SENSA DIRECTO: rumble directo del Kishi V2 Pro por USB (protocolo
+    // Interhaptics descifrado). Prioritario si el Kishi está conectado + con permiso.
+    private lateinit var usbManager: UsbManager
+    private lateinit var sensa: UsbHidRumbler
+    private var sensaMode = false
 
     @Volatile private var strongS = 0            // 0..65535
     @Volatile private var weakS = 0
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action == ACTION_TUNE) {
+                if (sensaMode) {
+                    sensa.setSensaParams(intent.getIntExtra("freq", 0), intent.getIntExtra("fps", 0))
+                    lastMode = "SENSA DIRECTO (${sensa.sensaInfo()})"
+                }
+                return
+            }
             if (intent.action != ACTION_RUMBLE) return
             val s = intent.getIntExtra("s", 0).coerceIn(0, 65535)
             val e = intent.getIntExtra("e", 0)
@@ -49,14 +63,16 @@ class RumbleHapticService : Service() {
             lastStrength = s
             lastEffect = e
 
-            if (directMode) {
-                if (s <= 0) {
-                    if (strongS == 0 && weakS == 0) rumbler.cancel()
-                } else {
-                    rumbler.vibrate(e, amp255(s), SUSTAIN_MS)
+            when {
+                sensaMode -> sensa.setSensaAmp(strengthToAmp(maxOf(strongS, weakS)))
+                directMode -> {
+                    if (s <= 0) {
+                        if (strongS == 0 && weakS == 0) rumbler.cancel()
+                    } else {
+                        rumbler.vibrate(e, amp255(s), SUSTAIN_MS)
+                    }
                 }
-            } else {
-                engine.setAmplitude(amp255(maxOf(strongS, weakS)) / 255.0)
+                else -> engine.setAmplitude(amp255(maxOf(strongS, weakS)) / 255.0)
             }
         }
     }
@@ -64,16 +80,33 @@ class RumbleHapticService : Service() {
     override fun onCreate() {
         super.onCreate()
 
-        directMode = rumbler.available()
-        lastMode = if (directMode) "DIRECTO (${rumbler.deviceName() ?: "?"})" else "AUDIO"
-        if (!directMode) {
-            engine.setMode(HapticEngine.Mode.PULSE)
-            engine.setFreq(55.0)
-            engine.start()
-            engine.setAmplitude(0.0)
+        usbManager = getSystemService(Context.USB_SERVICE) as UsbManager
+        sensa = UsbHidRumbler(usbManager)
+        val kishi = usbManager.deviceList.values.firstOrNull {
+            it.vendorId == ControllerInfo.RAZER_VENDOR_ID && usbManager.hasPermission(it)
+        }
+
+        when {
+            kishi != null -> {
+                sensaMode = true
+                lastMode = "SENSA DIRECTO (Kishi 0x${kishi.productId.toString(16)})"
+                sensa.startSensaStream(kishi, sensa.hapticEnableSequence(), 130) {}
+            }
+            rumbler.available() -> {
+                directMode = true
+                lastMode = "DIRECTO (${rumbler.deviceName() ?: "?"})"
+            }
+            else -> {
+                lastMode = "AUDIO"
+                engine.setMode(HapticEngine.Mode.PULSE)
+                engine.setFreq(55.0)
+                engine.start()
+                engine.setAmplitude(0.0)
+            }
         }
 
         val filter = IntentFilter(ACTION_RUMBLE)
+        filter.addAction(ACTION_TUNE)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
         } else {
@@ -96,13 +129,24 @@ class RumbleHapticService : Service() {
         return (boosted * 255.0).toInt().coerceIn(1, 255)
     }
 
+    /** Mapea la fuerza del juego (0..65535) a amplitud de onda Sensa (0..~28000). */
+    private fun strengthToAmp(s: Int): Int {
+        if (s <= 0) return 0
+        val norm = (s / 65535.0).coerceIn(0.0, 1.0)
+        return ((0.45 + 0.55 * sqrt(norm)) * 28000.0).toInt().coerceIn(1, 28000)
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
         try { unregisterReceiver(receiver) } catch (_: Exception) {}
-        if (directMode) rumbler.cancel() else engine.stop()
+        when {
+            sensaMode -> sensa.stopSensaStream()
+            directMode -> rumbler.cancel()
+            else -> engine.stop()
+        }
         super.onDestroy()
     }
 
@@ -114,10 +158,11 @@ class RumbleHapticService : Service() {
         channel.setSound(null, null)
         nm.createNotificationChannel(channel)
 
-        val modeText = if (directMode)
-            "Modo DIRECTO: ${rumbler.deviceName() ?: "control"} — sin Nexus"
-        else
-            "Modo AUDIO (HyperSense) — requiere Nexus"
+        val modeText = when {
+            sensaMode -> "Modo SENSA DIRECTO — Kishi por USB, sin Nexus"
+            directMode -> "Modo DIRECTO: ${rumbler.deviceName() ?: "control"} — sin Nexus"
+            else -> "Modo AUDIO (HyperSense) — requiere Nexus"
+        }
 
         val notif: Notification = Notification.Builder(this, CHANNEL_ID)
             .setContentTitle("RetroRazer — puente de rumble activo")
@@ -135,6 +180,7 @@ class RumbleHapticService : Service() {
 
     companion object {
         const val ACTION_RUMBLE = "com.retrorazer.rumblebridge.RUMBLE"
+        const val ACTION_TUNE = "com.retrorazer.rumblebridge.TUNE"
         private const val CHANNEL_ID = "rumble_bridge"
         private const val NOTIF_ID = 1
         private const val SUSTAIN_MS = 300L
