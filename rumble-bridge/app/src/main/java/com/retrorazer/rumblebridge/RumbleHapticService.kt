@@ -43,6 +43,11 @@ class RumbleHapticService : Service() {
             val e = intent.getIntExtra("e", 0)
             if (e == 1) weakS = s else strongS = s
 
+            // Diagnóstico: contamos cada broadcast recibido de RetroArch.
+            rxCount++
+            lastStrength = s
+            lastEffect = e
+
             if (directMode) {
                 val amp = s shr 8               // 0..255
                 if (amp <= 0) {
@@ -60,6 +65,7 @@ class RumbleHapticService : Service() {
         super.onCreate()
 
         directMode = rumbler.available()
+        lastMode = if (directMode) "DIRECTO (${rumbler.deviceName() ?: "?"})" else "AUDIO"
         if (!directMode) {
             engine.setMode(HapticEngine.Mode.PULSE)
             engine.setFreq(55.0)
@@ -120,5 +126,11 @@ class RumbleHapticService : Service() {
         private const val CHANNEL_ID = "rumble_bridge"
         private const val NOTIF_ID = 1
         private const val SUSTAIN_MS = 300L
+
+        // Diagnóstico visible desde MainActivity
+        @Volatile var rxCount = 0
+        @Volatile var lastStrength = 0
+        @Volatile var lastEffect = -1
+        @Volatile var lastMode = "—"
     }
 }

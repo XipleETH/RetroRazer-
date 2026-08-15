@@ -123,6 +123,18 @@ class MainActivity : Activity() {
         addButton("🎮 Simular rumble entrante (prueba del puente)") {
             simulateIncomingRumble()
         }
+        addButton("📊 Ver rumble recibido de RetroArch") {
+            log(
+                "Broadcasts de rumble recibidos: ${RumbleHapticService.rxCount}" +
+                "  | última fuerza=${RumbleHapticService.lastStrength}" +
+                "  motor=${RumbleHapticService.lastEffect}" +
+                "  | modo=${RumbleHapticService.lastMode}"
+            )
+            if (RumbleHapticService.rxCount == 0) {
+                log("→ 0 recibidos: RetroArch NO está emitiendo rumble. Revisa: Puerto 1 " +
+                    "= DualShock/Analog + Rumble ON en el núcleo. ¿Es el RetroArch PARCHEADO?")
+            }
+        }
 
         // --- Controles de entrada (Camino A) ---
         addTitle("1) Controles detectados (vibrador estándar)")
