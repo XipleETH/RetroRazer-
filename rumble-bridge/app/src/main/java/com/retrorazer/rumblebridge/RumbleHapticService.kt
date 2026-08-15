@@ -11,6 +11,7 @@ import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import kotlin.math.sqrt
 
 /**
  * Servicio en primer plano: recibe el rumble real de RetroArch (broadcast) y lo
@@ -49,14 +50,13 @@ class RumbleHapticService : Service() {
             lastEffect = e
 
             if (directMode) {
-                val amp = s shr 8               // 0..255
-                if (amp <= 0) {
+                if (s <= 0) {
                     if (strongS == 0 && weakS == 0) rumbler.cancel()
                 } else {
-                    rumbler.vibrate(e, amp, SUSTAIN_MS)
+                    rumbler.vibrate(e, amp255(s), SUSTAIN_MS)
                 }
             } else {
-                engine.setAmplitude(maxOf(strongS, weakS) / 65535.0)
+                engine.setAmplitude(amp255(maxOf(strongS, weakS)) / 255.0)
             }
         }
     }
@@ -82,6 +82,18 @@ class RumbleHapticService : Service() {
         }
 
         startForegroundCompat()
+    }
+
+    /**
+     * Mapea la fuerza del juego (0..65535) a amplitud 1..255 con una curva de
+     * refuerzo: incluso rumbles débiles (p.ej. 11%) se sienten fuertes.
+     * s=0 -> 0. s>0 -> entre ~115 y 255.
+     */
+    private fun amp255(s: Int): Int {
+        if (s <= 0) return 0
+        val norm = (s / 65535.0).coerceIn(0.0, 1.0)
+        val boosted = 0.45 + 0.55 * sqrt(norm)   // 0.45..1.0
+        return (boosted * 255.0).toInt().coerceIn(1, 255)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY

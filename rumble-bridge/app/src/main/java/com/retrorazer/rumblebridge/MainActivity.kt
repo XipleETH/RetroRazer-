@@ -123,6 +123,9 @@ class MainActivity : Activity() {
         addButton("🎮 Simular rumble entrante (prueba del puente)") {
             simulateIncomingRumble()
         }
+        addButton("🔎 Volcado de vibradores (diagnóstico modo directo)") {
+            log(ControllerScanner.rawDump())
+        }
         addButton("📊 Ver rumble recibido de RetroArch") {
             log(
                 "Broadcasts de rumble recibidos: ${RumbleHapticService.rxCount}" +

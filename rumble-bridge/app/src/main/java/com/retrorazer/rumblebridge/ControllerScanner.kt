@@ -66,6 +66,26 @@ object ControllerScanner {
         return result
     }
 
+    /** Volcado CRUDO de todos los InputDevice y sus vibradores (para diagnóstico). */
+    fun rawDump(): String = buildString {
+        val ids = InputDevice.getDeviceIds()
+        appendLine("InputDevices: ${ids.size}")
+        for (id in ids) {
+            val dev = InputDevice.getDevice(id) ?: continue
+            appendLine("• id=$id  '${dev.name}'  vid=0x${dev.vendorId.toString(16)} pid=0x${dev.productId.toString(16)}  sources=0x${dev.sources.toString(16)}")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vm = dev.vibratorManager
+                val vids = vm?.vibratorIds?.toList()
+                appendLine("    vibratorManager ids=$vids")
+                vids?.forEach { append("      vib[$it].hasVibrator=${vm.getVibrator(it).hasVibrator()}  ") }
+                if (!vids.isNullOrEmpty()) appendLine()
+            }
+            @Suppress("DEPRECATION")
+            val v = dev.vibrator
+            appendLine("    legacy getVibrator: ${if (v != null) "hasVibrator=${v.hasVibrator()}" else "null"}")
+        }
+    }
+
     /** Ids de motores que Android publica para el control, o vacío si ninguno. */
     private fun vibratorIdsOf(dev: InputDevice): List<Int> {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
