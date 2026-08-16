@@ -20,6 +20,8 @@ import java.util.concurrent.locks.LockSupport;
  * RetroRazer SENSA — rumble DIRECTO del Kishi V2 Pro dentro de RetroArch (en-proceso).
  * v6: DOS motores separados (fuerte=effect0, débil=effect1) en los dos canales del frame;
  * mapeo re-escalado al rango real del juego (~0..scaleMax) para que decaiga bien.
+ * v6.1: defaults afinados en hardware (barrido EXP-1) — ONDA SENOIDAL a 240 (punto dulce de
+ * resonancia del actuador), amplitud 16000 (menos brusco) y piso 0.04 (mata el "golpe al final").
  * Ajuste en vivo (com.retrorazer.RRSENSA_TUNE):
  *   --ei maxamp --ei scalep --ei floorp --ei curvep --ei freq --ei wave(0/1)
  *   --ei weakgain(%) --ei swap(0/1) --ei testamp
@@ -38,13 +40,13 @@ public final class RRSensa {
     private static volatile int weakS = 0;      // effect 1
     private static volatile int forceAmp = -1;
     private static volatile int rumbleN = 0;
-    // --- feel (ajustable en vivo) ---
-    private static volatile int maxAmp = 24000;
+    // --- feel (ajustable en vivo; defaults afinados en hardware con EXP-1) ---
+    private static volatile int maxAmp = 16000;      // menos brusco (era 24000)
     private static volatile int scaleMax = 300;      // rango real de fuerza del juego
-    private static volatile int freqHz = 150;
+    private static volatile int freqHz = 240;        // punto dulce de resonancia del Kishi (era 150)
     private static volatile double curve = 0.6;
-    private static volatile double floorFrac = 0.18;
-    private static volatile boolean sine = false;
+    private static volatile double floorFrac = 0.04; // mata el "golpe al final" (era 0.18)
+    private static volatile boolean sine = true;     // seno = más suave/limpio (era cuadrada)
     private static volatile int weakGainPct = 100;   // ganancia del motor débil (izq)
     private static volatile boolean swap = false;     // intercambia canales L/R
     private static Context appCtx;

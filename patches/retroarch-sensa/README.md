@@ -57,15 +57,30 @@ apksigner sign --ks debug.keystore --ks-pass pass:android RetroArch-RetroRazer.a
 Iterar solo el streamer (afinar vibración) es barato: recompila `RRSensa.java` →
 reemplaza `classes2.dex` → re-firma. No hace falta re-ensamblar el smali de RetroArch.
 
-## Feel / motores
+## Feel / motores (v6.1 — afinado en hardware)
 
-RRSensa maneja los **dos motores** del Kishi por separado: fuerte (libretro effect 0)
-y débil (effect 1), cada uno en su canal del frame de 64B. La fuerza del juego (rango
-real chico, ~0..255 en PS1, no 0..65535) se re-escala a amplitud con piso + curva para
-que los rumbles suaves se sientan y decaigan bien. Onda cuadrada (fuerte) o senoidal
-(suave). Todo es **ajustable en vivo** por broadcast `com.retrorazer.RRSENSA_TUNE`
-(extras int: `maxamp scalep floorp curvep freq wave weakgain swap testamp`), para
-calibrar el tacto sin recompilar. Logs con `adb logcat -s RRSensa`.
+RRSensa maneja los **dos motores** del Kishi por separado: fuerte (libretro effect 0) y débil
+(effect 1), cada uno en su canal del frame de 64 B. La fuerza del juego (rango real chico,
+~0..255 en PS1) se re-escala a amplitud con piso + curva para que los rumbles suaves se sientan
+y decaigan bien.
+
+Los **defaults v6.1 salieron de calibrar en el Kishi real** (barrido de frecuencia EXP-1):
+
+- **Onda senoidal** (era cuadrada) → más suave y limpia, menos "zumbido".
+- **240 Hz nominal** (era 150) → el **punto dulce de resonancia** del actuador, donde rinde
+  fuerte con poca amplitud.
+- **Amplitud 16000** (era 24000) → menos brusco, más parecido a la vibración sincronizada del
+  teléfono.
+- **Piso 0.04** (era 0.18) → **mata el "golpe fuerte al final"** de las ráfagas.
+
+Todo sigue **ajustable en vivo** por broadcast `com.retrorazer.RRSENSA_TUNE` (extras int:
+`maxamp scalep floorp curvep freq wave(0/1) weakgain swap testamp`), para recalibrar sin
+recompilar. `--ei testamp N --ei freq H --ei wave 1` genera un tono de prueba a `H` (útil para
+re-barrer la resonancia). Logs con `adb logcat -s RRSensa`.
+
+> **Siguiente nivel:** el actuador del Kishi es *wideband* (misma clase que el del PS5 DualSense);
+> [`HAPTICS_RESEARCH.md`](HAPTICS_RESEARCH.md) documenta el plan para llevar el rumble a síntesis
+> de 3 capas (transitorios + envolvente + textura) al nivel DualSense.
 
 ## Uso
 
